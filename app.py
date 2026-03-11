@@ -1,7 +1,7 @@
 import streamlit as st
 from datetime import date
 
-# 1. 페이지 설정
+# 1. 페이지 설정 및 디자인
 st.set_page_config(page_title="검단 중흥S-클래스 계산기", layout="wide")
 
 st.markdown("""
@@ -11,94 +11,104 @@ st.markdown("""
     .result-container { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6; }
     .result-label { font-size: 16px !important; font-weight: 600; color: #495057; }
     .result-value { font-size: 22px !important; font-weight: 800; color: #d9534f; }
+    .info-text { font-size: 13px; color: #666; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. 제목
+# 2. 제목 (2줄)
 st.markdown('<p class="main-title">🏢 검단 중흥S-클래스</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-title">중도금대출 통합 이자 계산기</p>', unsafe_allow_html=True)
+st.markdown('<p class="info-text">※ 타입 선택 시 분양가와 회차별 일정이 자동으로 세팅됩니다.</p>', unsafe_allow_html=True)
 
 # 3. 데이터 설정
-TYPE_DATA = {"72A": 435000000, "72B": 421000000, "84A": 498000000, "84B": 484000000, "101": 594000000, "147": 1110000000}
-FIXED_DATES = [date(2024, 6, 3), date(2025, 2, 3), date(2025, 10, 3), date(2026, 5, 3), date(2026, 10, 3), date(2027, 3, 3)]
+TYPE_DATA = {
+    "72A": 435000000, "72B": 421000000,
+    "84A": 498000000, "84B": 484000000,
+    "101": 594000000, "147": 1110000000
+}
 
-# 사이드바
-selected_type = st.sidebar.selectbox("타입 선택", list(TYPE_DATA.keys()))
+FIXED_DATES = [
+    date(2024, 6, 3), date(2025, 2, 3), date(2025, 10, 3),
+    date(2026, 5, 3), date(2026, 10, 3), date(2027, 3, 3)
+]
+
+# 4. 사이드바 (타입 선택 부활)
+st.sidebar.header("📋 타입 선택")
+selected_type = st.sidebar.selectbox("해당하는 타입을 선택하세요", list(TYPE_DATA.keys()))
 total_price = TYPE_DATA[selected_type]
 each_loan = int(total_price * 0.1)
 
-# 4. 고도화된 이자 계산 함수 (금리 변동 대응)
+st.sidebar.divider()
+st.sidebar.write(f"**선택 타입:** {selected_type}")
+st.sidebar.write(f"**총 분양가:** {total_price:,} 원")
+st.sidebar.write(f"**회차별 대출금(10%):** {each_loan:,} 원")
+
+# 5. 고도화된 이자 계산 함수 (금리 변동 및 상환 반영)
 def calculate_flexible_interest(start_date, amount, base_rate, changes, rep_amt, rep_date):
     today = date.today()
     if start_date > today: return 0, amount
     
-    # 1. 날짜별 이벤트 정리 (금리 변경, 상환)
-    timeline = [{'date': start_date, 'rate': base_rate, 'type': 'start'}]
+    # 날짜별 이벤트 정리
+    timeline = [{'date': start_date, 'rate': base_rate}]
     for c_date, c_rate in changes:
-        if c_date > start_date and c_date < today:
-            timeline.append({'date': c_date, 'rate': c_rate, 'type': 'rate_change'})
+        if start_date < c_date < today:
+            timeline.append({'date': c_date, 'rate': c_rate})
     
     timeline.sort(key=lambda x: x['date'])
-    timeline.append({'date': today}) # 종료점
+    timeline.append({'date': today})
     
     total_int = 0
     curr_principal = amount
     
-    # 2. 구간별 계산
     for i in range(len(timeline)-1):
         d1 = timeline[i]['date']
         d2 = timeline[i+1]['date']
         r = timeline[i].get('rate', base_rate)
         
-        # 만약 상환일이 이 구간 사이에 있다면?
+        # 구간 내 상환 발생 시
         if rep_amt > 0 and d1 <= rep_date < d2:
-            # 상환 전 구간
             days_pre = (rep_date - d1).days
             total_int += (curr_principal * (r/100) * days_pre) / 365
-            # 상환 후 구간
             curr_principal -= rep_amt
             days_post = (d2 - rep_date).days
             total_int += (curr_principal * (r/100) * days_post) / 365
         else:
-            # 일반 구간 계산
             days = (d2 - d1).days
             total_int += (curr_principal * (r/100) * days) / 365
             
     return int(total_int), curr_principal
 
-# 5. 메인 루프
+# 6. 메인 화면 구성
 total_all_interest = 0
 total_remaining_principal = 0
 
 for i in range(6):
     with st.expander(f"📍 {i+1}회차 ({FIXED_DATES[i].strftime('%Y-%m-%d')})", expanded=(i<2)):
-        col1, col2 = st.columns(2)
-        with col1:
+        c1, c2 = st.columns(2)
+        with c1:
             e_date = st.date_input(f"실행일_{i+1}", value=FIXED_DATES[i], key=f"d_{i}")
-            amt = st.number_input(f"원금_{i+1}", value=each_loan, step=10000, key=f"a_{i}")
+            amt = st.number_input(f"금액_{i+1}", value=each_loan, step=10000, key=f"a_{i}")
             b_rate = st.number_input(f"최초금리(%)_{i+1}", value=4.5, step=0.1, key=f"r_{i}")
-        with col2:
+        with c2:
             r_amt = st.number_input(f"중도상환액_{i+1}", value=0, key=f"rp_{i}")
             r_date = st.date_input(f"상환일_{i+1}", value=date.today(), key=f"rd_{i}")
 
-        # 금리 변동 입력 칸 (옵션)
-        st.caption("📉 금리 변경 기록 (있는 경우만 입력)")
-        ch_col1, ch_col2 = st.columns(2)
-        c_date = ch_col1.date_input(f"변경일_{i+1}", value=FIXED_DATES[i], key=f"cd_{i}")
-        c_rate = ch_col2.number_input(f"변경금리(%)_{i+1}", value=b_rate, key=f"cr_{i}")
+        st.caption("📉 금리 변경 기록 (있는 경우만)")
+        ch1, ch2 = st.columns(2)
+        c_date = ch1.date_input(f"변경일_{i+1}", value=FIXED_DATES[i], key=f"cd_{i}")
+        c_rate = ch2.number_input(f"변경금리(%)_{i+1}", value=b_rate, key=f"cr_{i}")
         
         changes = [(c_date, c_rate)] if c_rate != b_rate else []
-        
         interest, remain = calculate_flexible_interest(e_date, amt, b_rate, changes, r_amt, r_date)
         
         if e_date > date.today():
-            st.info("실행 예정")
+            st.info("실행 예정 회차")
         else:
             st.success(f"이자 합계: **{interest:,}원**")
             total_all_interest += interest
             total_remaining_principal += remain
 
-# 6. 결과 출력
+# 7. 최종 결과 (디자인 적용)
 st.divider()
 st.markdown('<p style="font-size:18px; font-weight:bold;">📊 최종 정산 결과 (오늘 기준)</p>', unsafe_allow_html=True)
 res_c1, res_c2 = st.columns(2)
