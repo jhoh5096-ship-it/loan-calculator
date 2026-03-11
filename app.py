@@ -32,27 +32,20 @@ FIXED_DATES = [
     date(2026, 5, 3), date(2026, 10, 3), date(2027, 3, 3)
 ]
 
-# 4. 사이드바 - 타입 변경 시 즉시 반영 로직
+# 4. 사이드바 및 상태 관리 (강제 리셋 로직)
+if 'last_type' not in st.session_state:
+    st.session_state.last_type = "72A"
+
 st.sidebar.markdown("### 🏠 타입 선택하기")
+selected_type = st.sidebar.selectbox("타입을 고르세요", list(TYPE_DATA.keys()))
 
-# 타입 변경 감지를 위한 세션 관리
-if 'current_type' not in st.session_state:
-    st.session_state.current_type = "72A"
-
-def on_type_change():
-    # 타입을 바꾸는 순간 모든 금액 입력창의 값을 초기화
+# 타입을 바꾸면 모든 입력값을 지우고 화면을 새로고침함
+if selected_type != st.session_state.last_type:
+    st.session_state.last_type = selected_type
     for i in range(6):
         if f"a_{i}" in st.session_state:
             del st.session_state[f"a_{i}"]
-
-selected_type = st.sidebar.selectbox(
-    "타입을 고르세요", 
-    list(TYPE_DATA.keys()), 
-    index=list(TYPE_DATA.keys()).index(st.session_state.current_type),
-    on_change=on_type_change,
-    key="type_selector"
-)
-st.session_state.current_type = selected_type
+    st.rerun() # 이 명령어가 화면을 강제로 다시 그리게 만듭니다.
 
 total_price = TYPE_DATA[selected_type]
 each_loan = int(total_price * 0.1)
@@ -60,7 +53,7 @@ each_loan = int(total_price * 0.1)
 st.sidebar.divider()
 st.sidebar.info(f"**현재 선택:** {selected_type} 타입\n\n**분양가:** {total_price:,} 원\n\n**회차별 대출금:** {each_loan:,} 원")
 
-# 5. 계산 함수
+# 5. 이자 계산 함수
 def calculate_flexible_interest(start_date, amount, base_rate, changes, rep_amt, rep_date):
     today = date.today()
     if start_date > today: return 0, amount
@@ -99,10 +92,10 @@ total_remaining_principal = 0
 
 for i in range(6):
     with st.expander(f"📍 {i+1}회차 ({FIXED_DATES[i].strftime('%Y-%m-%d')})", expanded=(i<2)):
-        c1, col_space, c2 = st.columns([1, 0.1, 1]) # 가독성을 위해 간격 조정
+        c1, c2 = st.columns(2)
         with c1:
             e_date = st.date_input(f"실행일_{i+1}", value=FIXED_DATES[i], key=f"d_{i}")
-            # value에 직접 each_loan을 넣어 타입 변경 시 즉시 바뀌도록 함
+            # value로 each_loan을 넣어 타입 변경시 즉시 동기화
             amt = st.number_input(f"금액_{i+1}", value=each_loan, step=10000, key=f"a_{i}")
             b_rate = st.number_input(f"최초금리(%)_{i+1}", value=4.5, step=0.1, key=f"r_{i}")
         with c2:
