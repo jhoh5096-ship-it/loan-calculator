@@ -94,4 +94,24 @@ for i in range(6):
 
         st.caption("📉 금리 변경 기록 (있는 경우만)")
         ch1, ch2 = st.columns(2)
-        c_date = ch1.date_input(f"변경일_{i+1}", value=FIXED_DATES[i], key=f"cd
+        c_date = ch1.date_input(f"변경일_{i+1}", value=FIXED_DATES[i], key=f"cd_{i}")
+        c_rate = ch2.number_input(f"변경금리(%)_{i+1}", value=b_rate, key=f"cr_{i}")
+        
+        changes = [(c_date, c_rate)] if c_rate != b_rate else []
+        interest, remain = calculate_flexible_interest(e_date, amt, b_rate, changes, r_amt, r_date)
+        
+        if e_date > date.today():
+            st.info("실행 예정 회차")
+        else:
+            st.success(f"이자 합계: **{interest:,}원**")
+            total_all_interest += interest
+            total_remaining_principal += remain
+
+# 7. 최종 결과
+st.divider()
+st.markdown('<p style="font-size:18px; font-weight:bold;">📊 최종 정산 결과 (오늘 기준)</p>', unsafe_allow_html=True)
+res_c1, res_c2 = st.columns(2)
+with res_c1:
+    st.markdown(f'<div class="result-container"><p class="result-label">오늘까지 총 이자</p><p class="result-value">{total_all_interest:,} 원</p></div>', unsafe_allow_html=True)
+with res_c2:
+    st.markdown(f'<div class="result-container"><p class="result-label">총 잔여 원금</p><p class="result-value">{total_remaining_principal:,} 원</p></div>', unsafe_allow_html=True)
