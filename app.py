@@ -9,8 +9,8 @@ st.markdown("""
     .main-title { font-size: 22px !important; font-weight: 800; color: #1E1E1E; line-height: 1.3; margin-bottom: 5px; }
     .sub-title { font-size: 20px !important; font-weight: 700; color: #2E5A9E; margin-bottom: 15px; }
     .result-container { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #dee2e6; }
-    .result-label { font-size: 16px !important; font-weight: 600; color: #495057; }
-    .result-value { font-size: 22px !important; font-weight: 800; color: #d9534f; }
+    .result-label { font-size: 14px !important; font-weight: 600; color: #495057; }
+    .result-value { font-size: 20px !important; font-weight: 800; color: #d9534f; }
     .sidebar-guide { font-size: 14px; color: #d9534f; font-weight: bold; margin-bottom: 10px; }
     </style>
     """, unsafe_allow_html=True)
@@ -32,20 +32,9 @@ FIXED_DATES = [
     date(2026, 5, 3), date(2026, 10, 3), date(2027, 3, 3)
 ]
 
-# 4. 사이드바 및 상태 관리 (강제 리셋 로직)
-if 'last_type' not in st.session_state:
-    st.session_state.last_type = "72A"
-
+# 4. 사이드바 - 타입 선택
 st.sidebar.markdown("### 🏠 타입 선택하기")
 selected_type = st.sidebar.selectbox("타입을 고르세요", list(TYPE_DATA.keys()))
-
-# 타입을 바꾸면 모든 입력값을 지우고 화면을 새로고침함
-if selected_type != st.session_state.last_type:
-    st.session_state.last_type = selected_type
-    for i in range(6):
-        if f"a_{i}" in st.session_state:
-            del st.session_state[f"a_{i}"]
-    st.rerun() # 이 명령어가 화면을 강제로 다시 그리게 만듭니다.
 
 total_price = TYPE_DATA[selected_type]
 each_loan = int(total_price * 0.1)
@@ -91,21 +80,22 @@ total_all_interest = 0
 total_remaining_principal = 0
 
 for i in range(6):
+    # 핵심 포인트: key에 selected_type을 섞어서 타입을 바꾸면 입력창 자체가 새로 고침되게 함
     with st.expander(f"📍 {i+1}회차 ({FIXED_DATES[i].strftime('%Y-%m-%d')})", expanded=(i<2)):
         c1, c2 = st.columns(2)
         with c1:
-            e_date = st.date_input(f"실행일_{i+1}", value=FIXED_DATES[i], key=f"d_{i}")
-            # value로 each_loan을 넣어 타입 변경시 즉시 동기화
-            amt = st.number_input(f"금액_{i+1}", value=each_loan, step=10000, key=f"a_{i}")
-            b_rate = st.number_input(f"최초금리(%)_{i+1}", value=4.5, step=0.1, key=f"r_{i}")
+            e_date = st.date_input(f"실행일_{i+1}", value=FIXED_DATES[i], key=f"d_{i}_{selected_type}")
+            # 타입을 바꾸면 key값이 변해서 값이 강제 갱신됨
+            amt = st.number_input(f"금액_{i+1}", value=each_loan, step=10000, key=f"a_{i}_{selected_type}")
+            b_rate = st.number_input(f"최초금리(%)_{i+1}", value=4.5, step=0.1, key=f"r_{i}_{selected_type}")
         with c2:
-            r_amt = st.number_input(f"중도상환액_{i+1}", value=0, step=10000, key=f"rp_{i}")
-            r_date = st.date_input(f"상환일_{i+1}", value=date.today(), key=f"rd_{i}")
+            r_amt = st.number_input(f"중도상환액_{i+1}", value=0, step=10000, key=f"rp_{i}_{selected_type}")
+            r_date = st.date_input(f"상환일_{i+1}", value=date.today(), key=f"rd_{i}_{selected_type}")
 
         st.caption("📉 금리 변경 기록 (있는 경우만)")
         ch1, ch2 = st.columns(2)
-        c_date = ch1.date_input(f"변경일_{i+1}", value=FIXED_DATES[i], key=f"cd_{i}")
-        c_rate = ch2.number_input(f"변경금리(%)_{i+1}", value=b_rate, key=f"cr_{i}")
+        c_date = ch1.date_input(f"변경일_{i+1}", value=FIXED_DATES[i], key=f"cd_{i}_{selected_type}")
+        c_rate = ch2.number_input(f"변경금리(%)_{i+1}", value=b_rate, key=f"cr_{i}_{selected_type}")
         
         changes = [(c_date, c_rate)] if c_rate != b_rate else []
         interest, remain = calculate_flexible_interest(e_date, amt, b_rate, changes, r_amt, r_date)
